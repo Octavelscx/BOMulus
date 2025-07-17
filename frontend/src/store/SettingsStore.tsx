@@ -1,13 +1,8 @@
 import { create } from 'zustand';
-import {
-  GetSavedAPIKeys,
-  GetAnalyzeSaveState,
-  GetAnalysisRefreshDays,
-} from '../../wailsjs/go/main/App';
-import { workspaces } from '../../wailsjs/go/models';
+const API_URL = '/api';
+import { APIKeys } from '../types/models';
 import { MonitorStore } from './MonitorStore';
 
-type APIKeys = workspaces.APIKeys;
 
 interface SettingsProps {
   apiKeys: APIKeys | null;
@@ -28,15 +23,15 @@ export const SettingsStore = create<SettingsProps>((set) => ({
     const Monitor = MonitorStore.getState();
     Monitor.setMonitor(true, 'Setting Panel', null);
     try {
-      const apiKeys: APIKeys = await GetSavedAPIKeys();
-      const analyzeSaveState: boolean = await GetAnalyzeSaveState();
-      const analysisRefreshDays: number = await GetAnalysisRefreshDays();
+      const keysRes = await fetch(`${API_URL}/api-keys`);
+      const apiKeys: APIKeys = await keysRes.json();
+      const analyzeRes = await fetch(`${API_URL}/analyze-save-state`);
+      const analyzeSaveState: boolean = await analyzeRes.json();
+      const daysRes = await fetch(`${API_URL}/refresh-days`);
+      const daysData = await daysRes.json();
+      const analysisRefreshDays: number = daysData.days;
       Monitor.setMonitor(false, 'Setting Panel', null);
-      set({
-        apiKeys,
-        analyzeSaveState,
-        analysisRefreshDays,
-      });
+      set({ apiKeys, analyzeSaveState, analysisRefreshDays });
     } catch (err) {
       Monitor.setMonitor(false, 'Setting Panel', String(err));
     }

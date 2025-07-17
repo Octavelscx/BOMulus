@@ -16,9 +16,13 @@ import (
 	"context"
 	"core"
 	"fmt"
+	"os"
 	"path/filepath"
 	"workspaces"
 
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -323,6 +327,7 @@ func (a *App) SetAnalyzeSaveState(state bool) error {
 	config.ANALYZE_SAVE_STATE = state
 	return nil
 }
+
 /*
 // GetProductionQuantity retrieves the selected production quantity by delegating to workspaces package.
 func (a *App) GetProductionQuantity(activeWorkspace workspaces.Workspace) (string, error) {
@@ -365,6 +370,269 @@ func (a *App) SetAnalysisRefreshDays(refreshDays int) error {
 	}
 	config.ANALYSIS_REFRESH_DAYS = refreshDays
 	return nil
+}
+
+/*╚══════════════════════════════════════════════╝*/
+
+/*╔══════════════ API HANDLERS ══════════════╗*/
+
+// CreateWorkspaceHandler handles workspace creation requests.
+func (a *App) CreateWorkspaceHandler(c *gin.Context) {
+	var req struct {
+		Path string `json:"path"`
+		Name string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := a.CreateWorkspace(req.Path, req.Name); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// GetRecentWorkspacesHandler returns recently opened workspaces.
+func (a *App) GetRecentWorkspacesHandler(c *gin.Context) {
+	ws, err := a.GetRecentWorkspaces()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, ws)
+}
+
+// BtnCompareHandler launches comparison of two component lists.
+func (a *App) BtnCompareHandler(c *gin.Context) {
+	var req struct {
+		V1 []core.Component `json:"v1"`
+		V2 []core.Component `json:"v2"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	a.BtnCompare(req.V1, req.V2)
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// SetActiveWorkspaceHandler sets the active workspace.
+func (a *App) SetActiveWorkspaceHandler(c *gin.Context) {
+	var ws workspaces.Workspace
+	if err := c.ShouldBindJSON(&ws); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := a.SetActiveWorkspace(ws); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// DeleteWorkspaceHandler deletes a workspace.
+func (a *App) DeleteWorkspaceHandler(c *gin.Context) {
+	var ws workspaces.Workspace
+	if err := c.ShouldBindJSON(&ws); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := a.DeleteWorkspace(ws); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// DeleteBOMFileHandler deletes a BOM file from a workspace.
+func (a *App) DeleteBOMFileHandler(c *gin.Context) {
+	var req struct {
+		Workspace workspaces.Workspace `json:"workspace"`
+		File      workspaces.FileInfo  `json:"file"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	a.DeleteBOMFile(req.Workspace, req.File)
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// AddFileToWorkspaceHandler adds a file to a workspace.
+func (a *App) AddFileToWorkspaceHandler(c *gin.Context) {
+	var req struct {
+		Workspace workspaces.Workspace `json:"workspace"`
+		File      core.XlsmFile        `json:"file"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := a.AddFileToWorkspace(req.Workspace, req.File); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// GetFilesInWorkspaceInfoHandler returns files info for a workspace.
+func (a *App) GetFilesInWorkspaceInfoHandler(c *gin.Context) {
+	var ws workspaces.Workspace
+	if err := c.ShouldBindJSON(&ws); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	files, err := a.GetFilesInWorkspaceInfo(ws)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, files)
+}
+
+// GetSavedAPIKeysHandler returns saved API keys.
+func (a *App) GetSavedAPIKeysHandler(c *gin.Context) {
+	keys, err := a.GetSavedAPIKeys()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, keys)
+}
+
+// SetProductionQuantityHandler sets production quantity for a workspace.
+func (a *App) SetProductionQuantityHandler(c *gin.Context) {
+	var req struct {
+		Workspace workspaces.Workspace `json:"workspace"`
+		Quantity  string               `json:"quantity"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := a.SetProductionQuantity(req.Workspace, req.Quantity); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// GetAnalysisRefreshDaysHandler retrieves refresh days.
+func (a *App) GetAnalysisRefreshDaysHandler(c *gin.Context) {
+	days, err := a.GetAnalysisRefreshDays()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"days": days})
+}
+
+// SetAnalysisRefreshDaysHandler sets refresh days.
+func (a *App) SetAnalysisRefreshDaysHandler(c *gin.Context) {
+	var req struct {
+		Days int `json:"days"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := a.SetAnalysisRefreshDays(req.Days); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// UploadBOMHandler handles BOM file uploads and returns parsed file info.
+func (a *App) UploadBOMHandler(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	tempPath := filepath.Join(os.TempDir(), file.Filename)
+	if err := c.SaveUploadedFile(file, tempPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	_, _, parsed := workspaces.FileProcessing(tempPath)
+	c.JSON(http.StatusOK, parsed)
+}
+
+// PriceCalculatorHandler returns pricing for components.
+func (a *App) PriceCalculatorHandler(c *gin.Context) {
+	var req struct {
+		Workspace workspaces.Workspace `json:"workspace"`
+		Quantity  float64              `json:"quantity"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	res, err := a.PriceCalculator(req.Workspace, req.Quantity)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+// GetComponentsHandler returns current components slice.
+func (a *App) GetComponentsHandler(c *gin.Context) {
+	comps := a.GetComponents()
+	c.JSON(http.StatusOK, comps)
+}
+
+// UpdateDesignatorsHandler saves designators changes.
+func (a *App) UpdateDesignatorsHandler(c *gin.Context) {
+	var designators []core.Designator
+	if err := c.ShouldBindJSON(&designators); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	a.UpdateDesignators(designators)
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// UpdateBMLSDesignatorsHandler updates designators in workspace file.
+func (a *App) UpdateBMLSDesignatorsHandler(c *gin.Context) {
+	var ws workspaces.Workspace
+	if err := c.ShouldBindJSON(&ws); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := a.UpdateBMLSDesignators(ws); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// GetAnalyzeSaveStateHandler returns current analyze save state.
+func (a *App) GetAnalyzeSaveStateHandler(c *gin.Context) {
+	state, err := a.GetAnalyzeSaveState()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, state)
+}
+
+// SetAnalyzeSaveStateHandler updates analyze save state.
+func (a *App) SetAnalyzeSaveStateHandler(c *gin.Context) {
+	var req struct {
+		State bool `json:"state"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := a.SetAnalyzeSaveState(req.State); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 /*╚══════════════════════════════════════════════╝*/

@@ -1,16 +1,10 @@
 import { create } from 'zustand';
-import {
-  RunAnalysis,
-  GetAnalysisState,
-  WebsocketProcess,
-} from '../../wailsjs/go/main/App';
+const API_URL = '/api';
 import { WSChooserStore } from './WSChooserStore';
-import { core } from '../../wailsjs/go/models';
+import { Component, AnalysisStatus } from '../types/models';
 import { CompareViewStore } from './CompareViewStore';
 import { MonitorStore } from './MonitorStore';
 
-type AnalysisStatus = core.AnalysisStatus;
-type Component = core.Component;
 
 interface AnalysisProps {
   analyzing: boolean;

@@ -1,11 +1,6 @@
 import { create } from 'zustand';
-import {
-  GetRecentWorkspaces,
-  SetActiveWorkspace,
-  DeleteWorkspace,
-} from '../../wailsjs/go/main/App';
-import { workspaces } from '../../wailsjs/go/models';
-type Workspace = workspaces.Workspace;
+const API_URL = '/api';
+import { Workspace } from '../types/models';
 import { MonitorStore } from './MonitorStore';
 import { SettingsStore } from './SettingsStore';
 
@@ -36,7 +31,8 @@ export const WSChooserStore = create<WSChooserProps>((set) => ({
     const Monitor = MonitorStore.getState();
     Monitor.setMonitor(true, 'Workspace', null);
     try {
-      const workspaces: Workspace[] = await GetRecentWorkspaces();
+      const res = await fetch(`${API_URL}/workspaces/recent`);
+      const workspaces: Workspace[] = await res.json();
       Monitor.setMonitor(false, 'Workspace', null);
       set({ workspaces, isVisible: true, WSManagerIsVisible: true });
     } catch (err) {
@@ -47,7 +43,11 @@ export const WSChooserStore = create<WSChooserProps>((set) => ({
     const Monitor = MonitorStore.getState();
     Monitor.setMonitor(true, 'Workspace', null);
     try {
-      await SetActiveWorkspace(workspace);
+      await fetch(`${API_URL}/set-active`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(workspace),
+      });
       Monitor.setMonitor(false, 'Workspace', null);
       SettingsStore.getState().loadSettings();
       set({
@@ -66,7 +66,11 @@ export const WSChooserStore = create<WSChooserProps>((set) => ({
     const state = WSChooserStore.getState();
     if (!state.workspaceToDelete) return;
     try {
-      await DeleteWorkspace(state.workspaceToDelete);
+      await fetch(`${API_URL}/workspaces`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state.workspaceToDelete),
+      });
       Monitor.setMonitor(false, 'Workspace', null);
       set({ workspaceToDelete: null });
       state.loadWorkspaces();

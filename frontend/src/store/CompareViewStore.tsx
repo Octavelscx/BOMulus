@@ -1,12 +1,11 @@
 import { create } from 'zustand';
-import { GetComponents } from '../../wailsjs/go/main/App';
+const API_URL = '/api';
 import { Monitor } from '../types/global';
-import { core } from '../../wailsjs/go/models';
+import { Component } from '../types/models';
 import { CalculatorStore } from './CalculatorStore';
 import { FunctionManagerStore } from './FunctionManagerStore';
 import { MonitorStore } from './MonitorStore';
 
-type Component = core.Component;
 
 interface CompareViewProps {
   components: Component[] | null;
@@ -83,7 +82,8 @@ export const CompareViewStore = create<CompareViewProps>((set) => ({
     const Monitor = MonitorStore.getState();
     Monitor.setMonitor(true, 'Compare View', null);
     try {
-      const components: Component[] = await GetComponents();
+      const res = await fetch(`${API_URL}/components`);
+      const components: Component[] = await res.json();
       const insert = components.filter(
         (component) => component.Operator === 'INSERT',
       );

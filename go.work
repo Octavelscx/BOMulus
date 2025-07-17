@@ -3,7 +3,7 @@ go 1.22.5
 use (
 	.
 	./config
-	./pkg/components
-	./pkg/core
-	./pkg/workspaces
+    ./server/pkg/components
+    ./server/pkg/core
+    ./server/pkg/workspaces
 )
