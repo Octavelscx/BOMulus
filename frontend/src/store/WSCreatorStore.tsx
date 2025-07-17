@@ -1,8 +1,5 @@
 import { create } from 'zustand';
-import {
-  OpenDirectoryDialog,
-  CreateWorkspace,
-} from '../../wailsjs/go/main/App';
+const API_URL = '/api';
 import { WSChooserStore } from './WSChooserStore';
 import { MonitorStore } from './MonitorStore';
 
@@ -26,15 +23,8 @@ export const WSCreatorStore = create<WSCreatorProps>((set) => ({
   },
   setWorkspaceName: (name: string) => set({ workspaceName: name }),
   chooseDirectory: async () => {
-    const Monitor = MonitorStore.getState();
-    Monitor.setMonitor(true, 'Workspace Creator', null);
-    try {
-      const workspacePath: string = await OpenDirectoryDialog();
-      Monitor.setMonitor(false, 'Workspace Creator', null);
-      set({ workspacePath });
-    } catch (err) {
-      Monitor.setMonitor(true, 'Workspace Creator', String(err));
-    }
+    const path = window.prompt('Workspace directory path');
+    if (path) set({ workspacePath: path });
   },
   createWorkspace: async () => {
     const Monitor = MonitorStore.getState();
@@ -47,12 +37,16 @@ export const WSCreatorStore = create<WSCreatorProps>((set) => ({
         'Please select a directory and enter a workspace name.',
       );
     try {
-      await CreateWorkspace(state.workspacePath, state.workspaceName);
+      await fetch(`${API_URL}/workspaces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: state.workspacePath, name: state.workspaceName }),
+      });
       Monitor.setMonitor(false, 'Workspace Creator', null);
       set({ isVisible: false });
       WSChooserStore.getState().loadWorkspaces();
     } catch (err) {
-      Monitor.setMonitor(true, 'Workspace Creator', null);
+      Monitor.setMonitor(true, 'Workspace Creator', String(err));
     }
   },
 }));

@@ -1,23 +1,12 @@
 import { create } from 'zustand';
-import {
-  OpenMultipleFilesDialog,
-  AddFileToWorkspace,
-  HeaderFiltersFileValidation,
-  GetFilesInWorkspaceInfo,
-  DeleteBOMFile,
-  UpdateVersionTags,
-  BtnCompare,
-  UpdateLastComparison,
-} from '../../wailsjs/go/main/App';
+const API_URL = '/api';
 import { Monitor } from '../types/global';
 import { WSChooserStore } from './WSChooserStore';
-import { workspaces } from '../../wailsjs/go/models';
-import { core } from '../../wailsjs/go/models';
+import { FileInfo, XlsmFile } from '../types/models';
 import { CompareViewStore } from './CompareViewStore';
 import { CalculatorStore } from './CalculatorStore';
 import { MonitorStore } from './MonitorStore';
-type FileInfo = workspaces.FileInfo;
-type XlsmFile = core.XlsmFile;
+
 
 interface FileManagerProps {
   files: FileInfo[] | null;
@@ -48,15 +37,16 @@ export const FileManagerStore = create<FileManagerProps>((set) => ({
     Monitor.setMonitor(true, 'File Manager', null);
     const activeWorkspace = WSChooserStore.getState().activeWorkspace;
     if (!activeWorkspace)
-      return Monitor.setMonitor(
-        false,
-        'File Manager',
-        'No active workspace found',
-      );
+      return Monitor.setMonitor(false, 'File Manager', 'No active workspace found');
     try {
-      const files: FileInfo[] = await GetFilesInWorkspaceInfo(activeWorkspace);
+      const res = await fetch(`${API_URL}/files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(activeWorkspace),
+      });
+      const files: FileInfo[] = await res.json();
       Monitor.setMonitor(false, 'File Manager', null);
-      set({ files: files });
+      set({ files });
     } catch (err) {
       Monitor.setMonitor(true, 'File Manager', String(err));
     }
@@ -153,7 +143,11 @@ export const FileManagerStore = create<FileManagerProps>((set) => ({
         'No active workspace found',
       );
     try {
-      await AddFileToWorkspace(activeWorkspace, file);
+      await fetch(`${API_URL}/add-file`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace: activeWorkspace, file }),
+      });
       set((state) => {
         const updatedFiles = state.filesToValidate?.slice(1);
         return {
@@ -184,7 +178,11 @@ export const FileManagerStore = create<FileManagerProps>((set) => ({
         'No active workspace found',
       );
     try {
-      await DeleteBOMFile(activeWorkspace, file);
+      await fetch(`${API_URL}/delete-bom`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace: activeWorkspace, file }),
+      });
       FileManagerStore.getState().loadFiles();
       Monitor.setMonitor(false, 'File Manager', null);
     } catch (err) {
@@ -219,7 +217,11 @@ export const FileManagerStore = create<FileManagerProps>((set) => ({
         'No active workspace found or no files to validate found',
       );
     try {
-      await UpdateVersionTags(files);
+      await fetch(`${API_URL}/update-version-tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(files),
+      });
       Monitor.setMonitor(false, 'File Manager', null);
     } catch (err) {
       Monitor.setMonitor(false, 'File Manager', String(err));
@@ -256,11 +258,11 @@ export const FileManagerStore = create<FileManagerProps>((set) => ({
     if (!filesToCompare[0] || !filesToCompare[1])
       return Monitor.setMonitor(false, 'File Manager', 'No files selected');
     try {
-      console.log(filesToCompare[0].components);
-      await BtnCompare(
-        filesToCompare[0].components,
-        filesToCompare[1].components,
-      );
+      await fetch(`${API_URL}/compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ v1: filesToCompare[0].components, v2: filesToCompare[1].components }),
+      });
       /*await UpdateLastComparison(
         activeWorkspace,
         filesToCompare[0],

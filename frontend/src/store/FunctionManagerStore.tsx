@@ -1,15 +1,11 @@
 import { create } from 'zustand';
 import { Monitor } from '../types/global';
-import { core } from '../../wailsjs/go/models';
+import { Designator } from '../types/models';
 import { CompareViewStore } from './CompareViewStore';
 import { WSChooserStore } from './WSChooserStore';
-import {
-  UpdateDesignators,
-  UpdateBMLSDesignators,
-} from '../../wailsjs/go/main/App';
+const API_URL = '/api';
 import { MonitorStore } from './MonitorStore';
 
-type Designator = core.Designator;
 
 interface FunctionManagerProps {
   designators: Designator[] | null;
@@ -170,8 +166,16 @@ export const FunctionManagerStore = create<FunctionManagerProps>((set) => ({
         'No designators found...',
       );
     try {
-      await UpdateDesignators(designators);
-      UpdateBMLSDesignators(activeWorkspace);
+      await fetch(`${API_URL}/designators`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(designators),
+      });
+      await fetch(`${API_URL}/designators/update-bmls`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(activeWorkspace),
+      });
       Monitor.setMonitor(false, 'Function Manager', null);
       CompareViewStore.getState().loadComponents();
     } catch (err) {

@@ -1,15 +1,11 @@
 import { create } from 'zustand';
-import {
-  SetProductionQuantity,
-  PriceCalculator,
-} from '../../wailsjs/go/main/App';
+const API_URL = '/api';
 import { Monitor } from '../types/global';
 import { WSChooserStore } from './WSChooserStore';
-import { components } from '../../wailsjs/go/models';
+import { PriceCalculationResult } from '../types/models';
 import { CompareViewStore } from './CompareViewStore';
 import { MonitorStore } from './MonitorStore';
 
-type PriceCalculationResult = components.PriceCalculationResult;
 
 interface CalculatorProps {
   productionQuantity: number;
@@ -47,15 +43,18 @@ export const CalculatorStore = create<CalculatorProps>((set) => ({
     try {
       const productionQuantity = CalculatorStore.getState().productionQuantity;
       if (!init) {
-        await SetProductionQuantity(
-          activeWorkspace,
-          productionQuantity.toString(),
-        );
+        await fetch(`${API_URL}/production-qty`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workspace: activeWorkspace, quantity: productionQuantity.toString() }),
+        });
       }
-      const calculationResult: PriceCalculationResult = await PriceCalculator(
-        activeWorkspace,
-        productionQuantity,
-      );
+      const res = await fetch(`${API_URL}/price-calc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace: activeWorkspace, quantity: productionQuantity }),
+      });
+      const calculationResult: PriceCalculationResult = await res.json();
       Monitor.setMonitor(false, 'Calculator', null);
       set({ calculationResult });
       CompareViewStore.getState().loadComponents();
